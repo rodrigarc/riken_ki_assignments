@@ -1,0 +1,134 @@
+---
+title: "Bioinformatics Analysis and Visualisation of Medical Genomics Data - Week 1"
+author: "Rodrigo Arcoverde Cerveira"
+date: '`r format(Sys.Date(), "%Y-%m-%d")`'
+output: 
+ html_document:
+    toc: true
+    depth: 2
+    toc_float: true
+    number_sections: true
+ github_document:
+    preview_html: false
+knit: (function(inputFile, encoding) {
+          rmarkdown::render(inputFile,
+                            encoding = encoding, 
+                            output_file = paste0(Sys.Date(), "_",
+                              xfun::sans_ext(inputFile), ".html"),
+                                output_dir = "../results/lab_book/")})
+---
+
+```{r global.options, include=FALSE}
+#setting up figures and chunks messages
+
+knitr::opts_knit$set(echo = TRUE,
+                     fig.width = 6, fig.height = 5,
+                     fig.align = "center",
+                     root.dir = rprojroot::find_rstudio_root_file(),
+                     out.width = 768,
+                     fig.pos = "H",
+                     warning = FALSE, 
+                     message = FALSE)
+knitr::opts_chunk$set(warning = FALSE,
+                      message = FALSE,
+                      fig.width = 6, fig.height = 5,
+                     fig.align = "center",
+                     out.width = 768,
+                     fig.pos = "H")
+
+result.dir <- paste0("results/",Sys.Date(),"/")
+
+## creates result.dir with date in if not existent
+ifelse(isFALSE(dir.exists(paste0("../",result.dir))), dir.create(paste0("../",result.dir),recursive = TRUE),"Result directory for today exists already!")
+
+result.dir <- here::here(result.dir)
+data.dir <- here::here("data")
+
+options(stringsAsFactors = FALSE) 
+```
+
+# Load libraries
+
+This R code chunk is loading several libraries and defining a custom color palette.
+
+```{r load_libraries}
+#Load libraries
+# if you do not have libraries, they are located in either CRAN or Bioconductor
+# libraries should be able to be automatically retrieved using renv::restore() function.
+library(ggsci)
+library(ggprism)
+library(tidyverse)
+```
+
+# Load data
+
+```{r load_data}
+# load magic_guys dataset
+magic_guys_df <- read.csv(paste0(data.dir,"/magic_guys.csv"))
+# load microarray_data dataset
+magic_guys_df <- read.table(paste0(data.dir,"/microarray_data.tab"), header = TRUE, sep = "\t")
+```
+
+# Task 1 - Literature
+
+1. Read the research article of the hands-on working group you are assigned to (see file “Student Groups.pdf” in shared folder General course material).
+2. Answer the following questions
+a. What is the medically relevant insight from the article?
+b. Which genomics technology/ technologies were used?
+3. Further related research questions
+a. List and explain at least three questions/ hypotheses you can think of that
+extend the analysis presented in the paper.
+b. [Optional] Devise a computational analysis strategy for (some of) the listed
+questions under 3a.
+
+# Task 2-3
+
+Task two rely on creating a public github repo to add assignments. rely on creating a Github a
+# Task 4 - Using R example datasets
+
+1. Use the R internal CO2 dataset (“data(CO2)”).
+2. Describe briefly the content of the CO2 dataset using the help function.
+3. What is the average and median CO2 uptake of the plants from Quebec and
+Mississippi?
+4. [Optional] In the “airway” example data from Bioconductor, how many genes are
+expressed in each sample? How many genes are not expressed in any sample?
+
+# Task 5 - R functions
+
+Task 5 - R Functions
+1. Write a function that calculates the ratio of the mean and the median of a given vector.
+           5
+This is a helpful measure to detect data with outlying values.
+Note: See Reference for R language
+2. Write a function that ignores the lowest and the highest value from a given vector and
+calculate the mean.
+3. Read about piping from here:https://r4ds.had.co.nz/pipes.html#pipes (you don’t have
+to learn everything, a basic understanding of the usage is enough). Write a short (max. 300 characters, no spaces) explanation of why, how, and when not to use pipes.
+4. Familiarize yourself with the apply-family of functions (apply, lapply, sapply etc.)
+http://uc-r.github.io/apply_family
+Write a short explanation (max. 300 characters, no spaces) of why they could be useful in your work.
+
+# Task 6 - Basic visualization with R
+
+
+1. Compare the distributions of the body heights of the two species from the 'magic_guys.csv' dataset graphically
+a. using the basic 'hist' function as well as ‘ggplot’ and ‘geom_histogram’ functions from the ggplot2 package. Optimize the plots for example by trying several different 'breaks'. Note that ggplot2-based functions give you many more options for changing the visualization parameters, try some of them.
+b. Do the same comparison as in a. but with boxplots. If you want to use the ggplot2-package, use the functions ‘ggplot’ and ‘geom_boxplot’.
+c. Save the plots with the ‘png’, ‘pdf’, and ‘svg’ formats. In which situation would you use which file format?
+2. Load the gene expression data matrix from the ‘microarray_data.tab’ dataset provided in the shared folder, it is a big tabular separated matrix.
+a. How big is the matrix in terms of rows and columns?
+b. Count the missing values per gene and visualize this result.
+c. Find the genes for which there are more than X% (X=10%, 20%, 50%)
+missing values.
+d. Replace the missing values by the average expression value for the particular
+gene. (Note: Imputing data has to be used with caution!)
+3. Visualize the data in the CO2 dataset in a way that gives you a deeper understanding
+of the data. What do you see?
+
+# Task 7 - Genomics data
+
+# Session info
+
+```{r session_info}
+sessionInfo()
+```
