@@ -69,12 +69,27 @@ library(tidyverse)
 1. Read the research article of the hands-on working group you are assigned to (see file “Student Groups.pdf” in shared folder General course material).
 2. Answer the following questions
 a. What is the medically relevant insight from the article?
+
+_The authors succesufully identified transcriptomic signatures that most likely play an important role in lupus disease establishment and disease exacerbation. These signature genes were specific to different immune cell types, reflecting the cell-type-specific mechanisms underlying this disease. Finally, the disease-activity signatures were associated with the therapeutic response to belimumab, a drug used to treat lupus, highlighting the potential for developing targeted therapies based on the distinct transcriptomic signatures of disease establishment and exacerbation._
+
 b. Which genomics technology/ technologies were used?
+
+_The majority of the analysis were based on Bulk RNA-seq from different FACS sorted cells. In addition, they have also used previously published scRNA-seq and GWAS datasets._
+
 3. Further related research questions
-a. List and explain at least three questions/ hypotheses you can think of that
-extend the analysis presented in the paper.
-b. [Optional] Devise a computational analysis strategy for (some of) the listed
-questions under 3a.
+a. List and explain at least three questions/ hypotheses you can think of that extend the analysis presented in the paper.
+
+_Are the adaptive immune signatures, such as the Th1 gene signature being associated to mucocutaneous lupus activity, linked to specific T clonotypes? A similar question can be posed for the B cells that had associated with disease signatures_
+
+_Recently, common viral infections have been linked to autoimmune diseases, such as Epstein-Barr Virus and multiple sclerosis. Previously, this and other viruses have been linked to trigger lupus as well. Coud you verify these in your dataset?_
+
+_Knowing all the samples were from Asians, the applicability to other populations is a limitation of the study. Even though they correlate some of their findings with an European ancestor, it would be better to explore or integrate this with a more diverse dataset. This would allow to potentially identify both population specific patterns of lupus but also common signatures across distinct populations._
+
+b. [Optional] Devise a computational analysis strategy for (some of) the listed questions under 3a.
+
+_Although bulk RNA-seq is not optimal for B cell receptor and T cell receptor analysis, since you do not have in depth sequencing of those. It is possible to use [TRUST4](https://www.nature.com/articles/s41592-021-01142-2) to reconstruct clonal lineages of those cells. With this data, it is possible to explore HV-HJ gene usage, clonality diversity, clonal expansion, and identify potential clones linked to either disease establishment or exacerbation. Due to the large number of adaptive immune receptor repertoire (AIRR) datasets for autoimmune diseases, one could also combine and or confirm the results found in your cohort with others._ 
+
+_Similar to the suggestion above, although bulk RNA-seq is not optimal for viral identification, it is possible to explore that. [VIRTUS](https://doi.org/10.1093/bioinformatics/btaa859) is one of the options to identify viral genomes in human bulk RNA-seq. This way, it is possible to identify in which cell clusters a specific virus is more likely to be found and associated to a gene signature_ 
 
 # Task 2-3
 
@@ -239,6 +254,7 @@ ggplot(magic_guys_df, aes(x = length, fill = species)) +
 b. Do the same comparison as in a. but with boxplots. If you want to use the ggplot2-package, use the functions ‘ggplot’ and ‘geom_boxplot’.
 
 ```{r}
+# plot a boxplot to compare the length/height of the two different species
 ggplot(magic_guys_df, aes(y = length, x = species, fill = species)) +
   geom_boxplot() +
   scale_fill_aaas() +
@@ -329,6 +345,7 @@ gene_thresholds <- do.call(rbind, threshold_data_list) %>%
 
 gene_thresholds
 ```
+
 _To avoid having large tables in this markdown, there is only printed the number of genes with missing values for each threshold. But if neeed, the genes could be explore on the `threshold_data_list`_
 
 d. Replace the missing values by the average expression value for the particular
@@ -342,7 +359,8 @@ microarray_df_imputed <- microarray_df %>%
 # Verify that missing values have been replaced
 microarray_df_imputed[1:5, 1:5]
 ```
-_You can confirm that the previous `NA` values in the g2 column were replaced with the mean. 
+
+_You can confirm that the previous `NA` values in the g2 column were replaced with the mean._ 
 
 3. Visualize the data in the CO2 dataset in a way that gives you a deeper understanding
 of the data. What do you see?
@@ -369,11 +387,12 @@ _Plants from Quebec and Mississippi exhibit distinctive carbon dioxide (CO2) upt
        devtools::install_github("hirscheylab/tidybiology")
        
 ```{r, eval=FALSE}
+# Install tidybiology if not yet installed
 devtools::install_github("hirscheylab/tidybiology")
-
 ```
 
 ```{r}
+# load library and needed datasets
 library(tidybiology)
 data("chromosome")
 data("proteins")
@@ -393,6 +412,7 @@ chromosome %>%
 b. How does the chromosome size distribute? Plot a graph that helps to visualize this by using ggplot2 package functions.
 
 ```{r}
+# Plot the length in mm of each chromosome
 chromosome %>%
   ggplot(aes(x = id, y = length_mm)) +
     geom_bar(stat = "identity", fill = "#3B4992B2", color = "black") +
@@ -401,8 +421,11 @@ chromosome %>%
     theme(aspect.ratio = 1,
           axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) 
 ```
+
 c. Does the number of protein coding genes or miRNAs correlate with the length of the chromosome? Make two separate plots to visualize these relationships.
+
 ```{r}
+# Plot a scatter and linear regression model for the protein coding gene counts and chromosome size
 g1 <- chromosome %>%
   ggplot(aes(x = protein_codinggenes, y = length_mm)) +
     geom_point() +
@@ -411,7 +434,7 @@ g1 <- chromosome %>%
     labs(x = "Protein Coding Genes", y = "Chromosome Size") +
     theme_prism(border = T, base_fontface = "plain", base_line_size = 0.5) +
     theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) 
-
+# Plot a scatter and linear regression model for miRNA counts and chromosome size
 g2 <- chromosome %>%
   ggplot(aes(x = mi_rna, y = length_mm)) +
     geom_point() +
@@ -421,7 +444,7 @@ g2 <- chromosome %>%
     theme_prism(border = T, base_fontface = "plain", base_line_size = 0.5) +
     theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) 
 
-
+# Arrange both plots side by side
 grid.arrange(g1, g2, ncol = 2)
 ```
 
