@@ -55,18 +55,13 @@ This R code chunk is loading several libraries and defining a custom color palet
 #Load libraries
 # if you do not have libraries, they are located in either CRAN or Bioconductor
 # libraries should be able to be automatically retrieved using renv::restore() function.
+library(ggpubr)
+library(airway)
+library(SummarizedExperiment)
+library(gridExtra)
 library(ggsci)
 library(ggprism)
 library(tidyverse)
-```
-
-# Load data
-
-```{r load_data}
-# load magic_guys dataset
-magic_guys_df <- read.csv(paste0(data.dir,"/magic_guys.csv"))
-# load microarray_data dataset
-magic_guys_df <- read.table(paste0(data.dir,"/microarray_data.tab"), header = TRUE, sep = "\t")
 ```
 
 # Task 1 - Literature
@@ -83,49 +78,376 @@ questions under 3a.
 
 # Task 2-3
 
-Task two rely on creating a public github repo to add assignments. rely on creating a Github a
+_Task two relies on creating a public github repo to add assignments. This is done and is publicly available as a deployed [website here](https://rodrigarc.github.io/riken_ki_assignments) or the [source code data here](https://github.com/rodrigarc/riken_ki_assignments)._
+
 # Task 4 - Using R example datasets
 
 1. Use the R internal CO2 dataset (“data(CO2)”).
+
+```{r}
+data(CO2)
+```
+
 2. Describe briefly the content of the CO2 dataset using the help function.
-3. What is the average and median CO2 uptake of the plants from Quebec and
-Mississippi?
-4. [Optional] In the “airway” example data from Bioconductor, how many genes are
-expressed in each sample? How many genes are not expressed in any sample?
+
+```{r}
+help(CO2)
+str(CO2)
+```
+
+_The CO2 dataset contains 84 rows and 5 columns, representing data from an experiment on frost resistance in Echinochloa crus-galli grass. It includes variables like 'Plant,' 'Type,' 'Treatment,' 'conc,' and 'uptake,' along with modeling formulas, axis labels, and measurement units._
+
+3. What is the average and median CO2 uptake of the plants from Quebec and Mississippi?
+
+```{r}
+# calculate mean of CO2 uptake in Quebec and Mississipi
+CO2 %>%
+  group_by(Type) %>%
+  summarise(co2_mean_uptake = mean(uptake))
+# calculate median of CO2 uptake in Quebec and Mississipi
+CO2 %>%
+  group_by(Type) %>%
+  summarise(co2_mean_uptake = median(uptake))
+```
+
+4. [Optional] In the “airway” example data from Bioconductor, how many genes are expressed in each sample? How many genes are not expressed in any sample?
+
+```{r}
+# Load the airway dataset
+data("airway")
+
+# Calculate the number of expressed genes/transcritps in each sample
+expressed_genes_per_sample <- colSums(assay(airway) > 0)
+
+# Calculate the number of genes not expressed in any sample
+genes_not_expressed_in_any_sample <- sum(rowSums(assay(airway) > 0) == 0)
+
+# Print the number of expressed genes for each sample
+cat("Number of expressed genes for each sample:\n")
+print(expressed_genes_per_sample)
+
+cat("\nNumber of genes not expressed in any sample:", genes_not_expressed_in_any_sample, "\n")
+```
+
+_PS.: Important to notice that by the size of this dataset, those are probably transcripts rather than only genes._
 
 # Task 5 - R functions
 
 Task 5 - R Functions
 1. Write a function that calculates the ratio of the mean and the median of a given vector.
-           5
 This is a helpful measure to detect data with outlying values.
 Note: See Reference for R language
-2. Write a function that ignores the lowest and the highest value from a given vector and
-calculate the mean.
+
+```{r}
+mean_to_median_ratio <- function(input_vector) {
+  if (length(input_vector) == 0) {
+    stop("Input vector is empty.")
+  }
+  
+  mean_val <- mean(input_vector)
+  median_val <- median(input_vector)
+  
+  if (median_val == 0) {
+    warning("Median is zero. The ratio may not be defined.")
+    return(NULL)
+  }
+  
+  ratio <- mean_val / median_val
+  return(ratio)
+}
+
+# Example usage:
+input_vector <- c(1, 2, 3, 4, 5)
+result <- mean_to_median_ratio(input_vector)
+cat("Mean-to-Median Ratio:", result, "\n")
+
+```
+
+2. Write a function that ignores the lowest and the highest value from a given vector and calculate the mean.
+
+```{r}
+mean_extremes_removal <- function(input_vector) {
+  if (length(input_vector) < 3) {
+    stop("Input vector should have at least three elements.")
+  }
+  
+  max_val <- max(input_vector)
+  min_val <- min(input_vector)
+  
+  filtered_vector <- input_vector[input_vector != max_val & input_vector != min_val]
+  
+  mean_val <- mean(filtered_vector)
+  return(mean_val)
+}
+
+# Example usage:
+input_vector <- c(1, 2, 3, 4, 5)
+result <- mean_extremes_removal(input_vector)
+cat("Mean (without extremes):", result, "\n")
+
+```
+
 3. Read about piping from here:https://r4ds.had.co.nz/pipes.html#pipes (you don’t have
 to learn everything, a basic understanding of the usage is enough). Write a short (max. 300 characters, no spaces) explanation of why, how, and when not to use pipes.
+
+
+_Pipes (e.g., `%>%` in tidyverse or the base R `|>` pipe) are used to streamline and enhance code readability by chaining operations. However, avoid excessive nesting for complex logic, as it can reduce code clarity and debuggability. In addition, piping is streamline, it does not work if it involves many inputs and outputs._
+
+
 4. Familiarize yourself with the apply-family of functions (apply, lapply, sapply etc.)
-http://uc-r.github.io/apply_family
-Write a short explanation (max. 300 characters, no spaces) of why they could be useful in your work.
+http://uc-r.github.io/apply_family/. Write a short explanation (max. 300 characters, no spaces) of why they could be useful in your work.
+
+_The apply-family functions (e.g., apply, lapply, sapply) are useful for speeding up and improving the readability of repetitive data manipulation tasks, reducing the need for explicit loops._
 
 # Task 6 - Basic visualization with R
 
 
 1. Compare the distributions of the body heights of the two species from the 'magic_guys.csv' dataset graphically
+
+```{r}
+# load magic_guys dataset
+magic_guys_df <- read.csv(paste0(data.dir,"/magic_guys.csv"))
+```
+
 a. using the basic 'hist' function as well as ‘ggplot’ and ‘geom_histogram’ functions from the ggplot2 package. Optimize the plots for example by trying several different 'breaks'. Note that ggplot2-based functions give you many more options for changing the visualization parameters, try some of them.
+
+```{r}
+# Identify species in the magic_guys dataset
+unique(magic_guys_df$species)
+
+# Separate data for two species (assuming you have a 'species' column) and plot using base hist() function
+magic_guys_df %>%
+  filter(species == "jedi") %>%
+  pull(length) %>%
+  hist()
+
+magic_guys_df %>%
+  filter(species == "sith") %>%
+  pull(length) %>%
+  hist()
+
+# Create histograms using 'ggplot2' with 'geom_histogram'
+ggplot(magic_guys_df, aes(x = length, fill = species)) +
+  geom_histogram(alpha = 0.7, position = "identity") +
+  geom_density(aes(y = ..count..), alpha = 0.7, color = "black") +
+  scale_fill_aaas() +
+  scale_color_aaas() +
+  theme_prism(border = TRUE, base_fontface = "plain", base_line_size = 0.5) +
+  theme(aspect.ratio = 1) +
+  facet_wrap(~species, ncol = 2)
+```
 b. Do the same comparison as in a. but with boxplots. If you want to use the ggplot2-package, use the functions ‘ggplot’ and ‘geom_boxplot’.
+
+```{r}
+ggplot(magic_guys_df, aes(y = length, x = species, fill = species)) +
+  geom_boxplot() +
+  scale_fill_aaas() +
+  theme_prism(border = T, base_fontface = "plain", base_line_size = 0.5) +
+  theme(aspect.ratio = 1) 
+```
 c. Save the plots with the ‘png’, ‘pdf’, and ‘svg’ formats. In which situation would you use which file format?
+
+```{r }
+# Save the plot in different formats
+ggsave(path = result.dir, "hist_species.png", width = 6, height = 6, dpi = 300)  # PNG format for web
+ggsave(path = result.dir, "hist_species.pdf", width = 6, height = 6)             # PDF format for high-quality printing
+ggsave(path = result.dir, "hist_species.svg", width = 6, height = 6)
+```
+
+
+_Use `png` when you need a raster image format suitable for web or digital display. It's useful for online articles, presentations, or sharing on websites._
+
+_Use `pdf` when you need a high-quality vector format that retains crispness when printed. PDFs are excellent for reports, publications, and printing on physical media._
+
+_Use `svg` when you need a vector format that can be easily edited and scaled without loss of quality. SVGs are suitable for vector graphics editing software or embedding in web pages. However, I usually save as pdf since Illustrator and affinity do not seem to like the format that R saves the svg_
+
 2. Load the gene expression data matrix from the ‘microarray_data.tab’ dataset provided in the shared folder, it is a big tabular separated matrix.
+
+```{r}
+# load microarray_data dataset
+microarray_df <- read.table(paste0(data.dir,"/microarray_data.tab"), header = TRUE, sep = "\t")
+```
 a. How big is the matrix in terms of rows and columns?
+
+```{r}
+# Get the number of rows and columns in the data frame
+microarray_dim <- dim(microarray_df)
+# Extract the number of rows and columns
+num_rows <- microarray_dim[1]
+num_columns <- microarray_dim[2]
+# Print the number of rows and columns
+cat("Number of Rows:", num_rows, "\n")
+cat("Number of Columns:", num_columns, "\n")
+```
+
 b. Count the missing values per gene and visualize this result.
-c. Find the genes for which there are more than X% (X=10%, 20%, 50%)
-missing values.
+```{r}
+# Count missing values (NA) per gene
+missing_values_per_gene <- colSums(is.na(microarray_df))
+# Create a data frame for visualization
+missing_values_data <- data.frame(Gene = names(missing_values_per_gene),
+                                  Missing_Values = missing_values_per_gene)
+# Create a bar plot using ggplot2
+missing_values_data %>%
+  ggplot(aes(x = reorder(Gene, -Missing_Values), y = Missing_Values)) +
+  geom_bar(stat = "identity", color = "lightblue") +
+  labs(title = "Missing Values per Gene", x = "Gene label", y = "Count of Missing Values") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_x_discrete(labels = function(x) ifelse(seq_along(x) %% 100 == 0, x, "")) +
+  theme_prism(border = F, base_fontface = "plain", base_line_size = 0.5) +
+  theme(axis.ticks.x = element_blank()) 
+```
+
+c. Find the genes for which there are more than X% (X=10%, 20%, 50%) missing values.
+
+```{r}
+
+# Set the desired percentage thresholds
+thresholds <- c(0.1, 0.2, 0.5)  # Thresholds as proportions
+
+# Calculate the total number of samples (columns) in the data frame
+total_samples <- ncol(microarray_df)
+
+# Create a list of data frames, one for each threshold
+threshold_data_list <- lapply(thresholds, function(threshold) {
+  # Count missing values (NA) per gene for the current threshold
+  missing_values_per_gene <- colSums(is.na(microarray_df)) > threshold * total_samples
+  # Create a data frame for the current threshold
+  threshold_data <- data.frame(
+    Gene = names(missing_values_per_gene),
+    Missing_Values = missing_values_per_gene,
+    Threshold = threshold
+  )
+  return(threshold_data)
+})
+
+# Combine the list of data frames into one data frame
+gene_thresholds <- do.call(rbind, threshold_data_list) %>%
+  group_by(Threshold, Missing_Values) %>%
+  summarise(gene_count = n()) %>%
+  ungroup()
+
+gene_thresholds
+```
+_To avoid having large tables in this markdown, there is only printed the number of genes with missing values for each threshold. But if neeed, the genes could be explore on the `threshold_data_list`_
+
 d. Replace the missing values by the average expression value for the particular
 gene. (Note: Imputing data has to be used with caution!)
+
+```{r}
+# Replace missing values with the average expression value for each gene
+microarray_df_imputed <- microarray_df %>%
+  mutate(across(everything(), ~ifelse(is.na(.), mean(., na.rm = TRUE), .)))
+
+# Verify that missing values have been replaced
+microarray_df_imputed[1:5, 1:5]
+```
+_You can confirm that the previous `NA` values in the g2 column were replaced with the mean. 
+
 3. Visualize the data in the CO2 dataset in a way that gives you a deeper understanding
 of the data. What do you see?
 
+```{r}
+# plot CO2 dataset with grouping based on treatment and wrapped with type
+ggplot(CO2, aes(x = conc, y = uptake, color = Treatment, group = Treatment)) +
+  geom_point() +
+  geom_smooth() +
+  labs(title = "CO2 Concentration vs. Uptake", x = "CO2 Concentration", y = "Uptake") +
+  facet_wrap(~Type) +
+  scale_color_manual(values = c("#EE0000B2", "#3B4992B2")) +
+  theme_prism(border = T, base_fontface = "plain", base_line_size = 0.5) +
+  theme(aspect.ratio = 1) 
+
+pal_aaas( alpha = 0.7)(2)
+```
+
+_Plants from Quebec and Mississippi exhibit distinctive carbon dioxide (CO2) uptake profiles regardless of temperature conditions. Quebec plants consistently demonstrate higher CO2 uptake rates than their Mississippi counterparts. Temperature sensitivity reveals Mississippi plants to be more influenced by chilling, experiencing a drastic reduction in uptake, primarily beyond 250 ml/L CO2 concentration. In contrast, Quebec plants show greater resilience to temperature variations. This divergence may be attributed to their differing climates, with colder temperatures in Quebec potentially driving natural selection for plants with high CO2 uptake capabilities under cold conditions. These findings could emphasize the remarkable adaptability and regional distinctions in plant CO2 assimilation strategies. However, more information about the dataset, plant species, and reserch questions prior the experiment should be taken into account before drawing further conclusions._
+
 # Task 7 - Genomics data
+
+1. Install the Tidybiology package, which includes the data ‘chromosome’ and ‘proteins’
+       devtools::install_github("hirscheylab/tidybiology")
+       
+```{r, eval=FALSE}
+devtools::install_github("hirscheylab/tidybiology")
+
+```
+
+```{r}
+library(tidybiology)
+data("chromosome")
+data("proteins")
+```
+
+a. Extract summary statistics (mean, median and maximum) for the following variables from the ‘chromosome’ data: variations, protein coding genes, and miRNAs. Utilize the tidyverse functions to make this as simply as possible.
+
+```{r}
+# Print colnames in the chromosome dataset
+colnames(chromosome)
+# Filter the selected columns and calculate the mean using the summary function
+chromosome %>% 
+  select(variations, protein_codinggenes, mi_rna) %>% 
+  summary()
+```
+
+b. How does the chromosome size distribute? Plot a graph that helps to visualize this by using ggplot2 package functions.
+
+```{r}
+chromosome %>%
+  ggplot(aes(x = id, y = length_mm)) +
+    geom_bar(stat = "identity", fill = "#3B4992B2", color = "black") +
+    labs(title = "Chromosome Size Distribution", x = "Chromosome Number", y = "Length (mm)") +
+    theme_prism(border = T, base_fontface = "plain", base_line_size = 0.5) +
+    theme(aspect.ratio = 1,
+          axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) 
+```
+c. Does the number of protein coding genes or miRNAs correlate with the length of the chromosome? Make two separate plots to visualize these relationships.
+```{r}
+g1 <- chromosome %>%
+  ggplot(aes(x = protein_codinggenes, y = length_mm)) +
+    geom_point() +
+    geom_smooth(method = "lm", color = "#EE0000B2") +
+    stat_cor(method = "pearson") +
+    labs(x = "Protein Coding Genes", y = "Chromosome Size") +
+    theme_prism(border = T, base_fontface = "plain", base_line_size = 0.5) +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) 
+
+g2 <- chromosome %>%
+  ggplot(aes(x = mi_rna, y = length_mm)) +
+    geom_point() +
+    geom_smooth(method = "lm", color = "#EE0000B2") +
+    stat_cor(method = "pearson") +
+    labs(x = "miRNAs", y = "Chromosome Size") +
+    theme_prism(border = T, base_fontface = "plain", base_line_size = 0.5) +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) 
+
+
+grid.arrange(g1, g2, ncol = 2)
+```
+
+d. Calculate the same summary statistics for the ‘proteins’ data variables length and mass. Create a meaningful visualization of the relationship between these two variables by utilizing the ggplot2 package functions. Play with the colors, theme- and other visualization parameters to create a plot that pleases you.
+
+```{r}
+# Inspeact proteins dataset
+str(proteins)
+
+# Print summary of those variables
+proteins %>% select(length, mass) %>% summary()
+
+# Plot the proteins
+proteins %>%
+  ggplot(aes(x = length, y = mass)) +
+  geom_bin2d() +
+    scale_x_log10() +
+    scale_y_log10() +
+    geom_smooth(method = "lm", color = "#EE0000B2") +
+    stat_cor(method = "pearson") +
+    scale_fill_viridis_c(option = "inferno") +
+    labs(title = "Relationship between Length and Mass in Proteins", x = "Length", y = "Mass") +
+    theme_prism(border = T, base_fontface = "plain", base_line_size = 0.5) +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+          aspect.ratio = 1) 
+```
 
 # Session info
 
