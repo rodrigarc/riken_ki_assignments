@@ -1,0 +1,358 @@
+---
+title: "Bioinformatics Analysis and Visualisation of Medical Genomics Data - Week 2"
+author: "Rodrigo Arcoverde Cerveira"
+date: '`r format(Sys.Date(), "%Y-%m-%d")`'
+output: 
+ html_document:
+    toc: true
+    depth: 2
+    toc_float: true
+    number_sections: true
+ github_document:
+    preview_html: false
+knit: (function(inputFile, encoding) {
+          rmarkdown::render(inputFile,
+                            encoding = encoding, 
+                            output_file = paste0(Sys.Date(), "_",
+                              xfun::sans_ext(inputFile), ".html"),
+                                output_dir = "../results/lab_book/")})
+---
+
+```{r global.options, include=FALSE}
+#setting up figures and chunks messages
+
+knitr::opts_knit$set(echo = TRUE,
+                     fig.width = 6, fig.height = 5,
+                     fig.align = "center",
+                     root.dir = rprojroot::find_rstudio_root_file(),
+                     out.width = 768,
+                     fig.pos = "H",
+                     warning = FALSE, 
+                     message = FALSE)
+knitr::opts_chunk$set(warning = FALSE,
+                      message = FALSE,
+                      fig.width = 6, fig.height = 5,
+                     fig.align = "center",
+                     out.width = 768,
+                     fig.pos = "H")
+
+result.dir <- paste0("results/",Sys.Date(),"/")
+
+## creates result.dir with date in if not existent
+ifelse(isFALSE(dir.exists(paste0("../",result.dir))), dir.create(paste0("../",result.dir),recursive = TRUE),"Result directory for today exists already!")
+
+result.dir <- here::here(result.dir)
+data.dir <- here::here("data")
+
+options(stringsAsFactors = FALSE) 
+```
+
+# Load libraries
+
+This R code chunk is loading the needed libraries.
+
+```{r load_libraries}
+# Load libraries
+# if you do not have libraries, they are located in either CRAN or Bioconductor
+# libraries should be able to be automatically retrieved using renv::restore() function.
+library(ComplexHeatmap)
+library(grid)
+library(tidyverse)
+library(ggsci)
+library(ggprism)
+```
+
+# Load data 
+
+```{r}
+# Load tab separated file to generate the plot
+sle_state_degs <- read.table(paste0(data.dir, "/Disease_state_DEG_sumstats.txt"), sep = "\t", header = TRUE)
+sle_activity_degs <- read.table(paste0(data.dir, "/Disease_activity_DEG_sumstats.txt"), sep = "\t", header = TRUE)
+
+# Merge datasets based on cell type and gene
+merged_degs <- full_join(sle_activity_degs, sle_state_degs,by = c("Cell.type","Gene"), suffix = c("_activity", "_state"))
+
+# Use pivot_longer to reshape the data
+long_merged_degs <- merged_degs %>%
+  pivot_longer(
+    cols = c("FDR_state", "FDR_activity"),  
+    names_to = "type",
+    values_to =  "FDR"
+  ) %>%
+  mutate(type = gsub("FDR_", "", type))
+```
+
+# Set lineages names
+
+The code assigns lineage names to specific cell types based on predefined subsets. It creates a new column, cell_lineage, in the dataset long_merged_degs, and classifies each cell type into one of several predefined lineages. If a cell type doesn't match any subset, it's categorized as "Other."
+
+```{r}
+# Define subsets of cell types within different lineages
+subsets <- list(
+    CD4 = c("Naive CD4", "Mem CD4", "Th1", "Th2", "Th17", "Tfh", "Fr. I nTreg", "Fr. II eTreg", "Fr. III T"),
+    CD8 = c("Naive CD8", "CM CD8", "EM CD8", "TEMRA CD8"),
+    B = c("Naive B", "USM B", "SM B", "DN B", "Plasmablast"),
+    Monocyte = c("CL Mono", "CD16p Mono", "Int Mono", "NC Mono"),
+    DC = c("pDC", "mDC"),
+    Neutrophils = c("Neu", "LDG"))
+
+# Add a 'cell_lineage' column to the 'long_merged_degs' dataset
+long_merged_degs <- long_merged_degs %>%
+  mutate(cell_lineage = case_when(
+    # Assign cell lineages based on cell types
+    Cell.type %in% subsets$CD4 ~ "CD4+ T cells",
+    Cell.type %in% subsets$CD8 ~ "CD8+ T cells",
+    Cell.type %in% subsets$B ~ "B cells",
+    Cell.type %in% subsets$Monocyte ~ "Monocytes",
+    Cell.type %in% subsets$DC ~ "Dendritic cell",
+    Cell.type %in% subsets$Neutrophils ~ "Neutrophils",
+    Cell.type == "NK" ~ "Natural killer cells",
+    TRUE ~ "Other"  # If not found in any subset, assign as 'Other'
+  ))
+```
+
+
+
+# Jaccard indices calculation
+
+The code computes Jaccard indices for cell types based on gene expression data. It processes and categorizes genes into "Disease-activity only," "Disease-state only," and "Both significant" groups. Proportions of these categories are calculated within each cell type. Dominance is determined, classifying cell types as "Disease state dominant," "Disease activity dominant," or "Shared dominant." An 'order_plot' value for visualization is also created, providing insights into gene regulation within cell types and their roles in disease states or activities.
+
+```{r}
+# Transform gene expression data into a wide format and calculate gene significance
+filtered_degs_fc <- long_merged_degs %>%
+  pivot_wider(names_from = type, values_from = FDR) %>%
+  mutate(
+    # Categorize genes into 'degs_presence' based on significance and regulation
+    degs_presence = case_when(
+      state < 0.05 & activity < 0.05 & (logFC_state * logFC_activity) > 0 ~ "Both significant",
+      activity < 0.05 ~ "Disease-activity only",
+      state < 0.05 ~ "Disease-state only",
+      TRUE ~ "non_significant"
+    ),
+    regulation = case_when(
+      logFC_state > 0 & logFC_activity > 0 ~ "Upregulated",
+      logFC_state < 0 & logFC_activity < 0 ~ "Downregulated",
+      logFC_state > 0 & logFC_activity < 0 ~ "Upregulated disease-state",
+      logFC_state < 0 & logFC_activity > 0 ~ "Upregulated disease-activity"
+    )
+  ) %>%
+  filter(degs_presence != "non_significant")  # Filter out non-significant genes
+
+# Group and summarize gene information within cell types and lineages
+filtered_degs <- filtered_degs_fc %>%
+  group_by(Cell.type, cell_lineage) %>%
+  summarize(
+    total_degs = n(),
+    "Disease-activity only" = sum(degs_presence == "Disease-activity only") / n(),
+    "Disease-state only" = sum(degs_presence == "Disease-state only") / n(),
+    "Both significant" = sum(degs_presence == "Both significant") / n()
+  ) %>%
+  pivot_longer(
+    cols = c("Disease-activity only", "Disease-state only", "Both significant"),
+    values_to = "proportion",
+    names_to = "degs_presence"
+  ) %>%
+  ungroup()
+
+# Determine gene category dominance and create an 'order_plot' value for visualization
+filtered_degs <- filtered_degs %>%
+  group_by(Cell.type) %>%
+  mutate(
+    dominance = case_when(
+      proportion[degs_presence == "Both significant"] > 0.15 ~ "Shared dominant",
+      proportion[degs_presence == "Disease-activity only"] > proportion[degs_presence == "Disease-state only"] ~ paste("Disease activity dominant"),
+      TRUE ~ "Disease state dominant"
+    ),
+    order_plot = case_when(
+      dominance == "Disease state dominant" ~ 10 + proportion,
+      dominance == "Disease activity dominant" ~ 100 + proportion,
+      dominance == "Shared dominant" ~ 1000 + proportion[degs_presence == "Both significant"]
+    )
+  )
+
+```
+
+# Plot bar plot for total Differentially Expressed Genes
+
+The provided code calculates summary statistics for the number of differentially expressed genes (DEGs) within specific categories of cell types, cell lineages, and dominance. It then creates a bar plot using ggplot2 to visualize these statistics. The x-axis is reordered based on 'order_plot' values, improving the representation of the data. The bar plot displays the number of DEGs, with each bar color-coded by cell lineage.
+
+```{r}
+# Calculate summary statistics for DEGs
+summ_degs_stats <- filtered_degs %>%
+  group_by(Cell.type, cell_lineage, dominance) %>%
+  summarise(summ_degs = max(total_degs),
+            order_plot = max(order_plot)) %>%
+  distinct()
+
+# Create a bar plot using ggplot2
+g1 <- summ_degs_stats %>%
+  ggplot(aes(y = summ_degs, x = fct_reorder(Cell.type, order_plot), fill = cell_lineage)) +
+  geom_col(color = "black") +
+  scale_fill_lancet() +
+  labs(y = "Number of DEGs", x = "", fill = "Cell ineage") +
+  theme_prism(base_fontface = "plain", base_line_size = .3, base_size = 10, border = TRUE) +
+  theme(axis.text.x = element_blank(),
+        legend.title = element_text(),
+        legend.position = "right",
+        plot.margin = margin(2,.5,.5,.5, "cm")) 
+
+g1
+```
+
+# Plot proportion of degs
+
+The code presented generates a visualization to depict the proportion of differentially expressed genes (DEGs) across various categories. It first calculates summary statistics for DEGs, considering cell type, cell lineage, and dominance. The resulting values help in organizing the plot. Using ggplot2, the script creates a bar plot with x-axis labels reordered based on the 'order_plot' values, improving the presentation of data. The fill colors represent different DEG types. This visualization provides insights into how DEGs are distributed among different cell types and their respective lineages, offering a clear representation of their proportions.
+
+```{r}
+# Create column with correct order based on the maximum value of the proprotion of degs
+g2 <- filtered_degs %>% 
+  group_by(Cell.type, cell_lineage, dominance) %>%
+  mutate(summ_degs = max(total_degs),
+            order_plot = max(order_plot)) %>% 
+# Plot a stacked bar plot of the proportions of each cell type
+  ggplot(aes(x = fct_reorder(Cell.type, order_plot), y = proportion, fill = degs_presence)) +
+  geom_col(color = "black") +
+  scale_fill_viridis_d(direction = -1, option = "D") +
+  scale_y_continuous(expand = c(0,0), limits = c(0,1.1)) +
+  labs(x = "", y = "DEGs proportion", fill = "DEG type") +
+  theme_prism(base_fontface = "plain", base_line_size = .3, base_size = 10, border = FALSE) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+        legend.title = element_text(),
+        legend.position = "right",
+        plot.margin = margin(0,.1,.5,.5, "cm")) 
+
+g2
+```
+
+# Merge plots and save them
+
+Use `gridExtra` to arrange the two plots to save together in a single file. This reproduces exactly the results found in the paper by [Nakano et al. (2022)](https://doi.org/10.1016/j.cell.2022.07.021).
+
+```{r}
+merged_plot_degs <- gridExtra::grid.arrange(g1,g2, ncol = 1, as.table = FALSE)
+ggsave(merged_plot_degs, filename = paste0(result.dir, "/merged_plot.pdf"), height = 5, width = 7)
+```
+
+# Data transformation for heatmap
+
+Exploring another visualization tool for the proportion of DEGs from the same paper.This way, the proportion of both upregulated and downregulated are for the classication, which in the original paper the type of DEGs (up or down) is not taken into consideration in the main figure.
+
+```{r}
+# Group data by 'Cell.type,' 'cell_lineage,' and 'regulation'
+filtered_degs_fc_plot <- filtered_degs_fc %>%
+  group_by(Cell.type, cell_lineage, regulation) %>%
+
+  # Calculate total number of DEGs and proportions of different DEG types
+  summarize(
+    total_degs = n(),
+    "Disease-activity only" = sum(degs_presence == "Disease-activity only") / n(),
+    "Disease-state only" = sum(degs_presence == "Disease-state only") / n(),
+    "Both significant" = sum(degs_presence == "Both significant") / n(),
+  ) %>%
+
+  # Convert data to a longer format for further analysis
+  pivot_longer(
+    cols = c("Disease-activity only", "Disease-state only", "Both significant"),
+    values_to = "proportion",
+    names_to = "degs_presence"
+  ) %>%
+
+  # Ungroup the data
+  ungroup()
+
+# Further data manipulation to determine 'dominance' and 'order_plot'
+filtered_degs_fc_plot <- filtered_degs_fc_plot %>%
+  group_by(Cell.type, regulation) %>%
+
+  # Define 'dominance' based on specific conditions
+  mutate(
+    dominance = case_when(
+      proportion[degs_presence == "Both significant"] > 0.15 ~ "Shared dominant",
+      proportion[degs_presence == "Disease-activity only"] > proportion[degs_presence == "Disease-state only"] ~ paste("Disease activity dominant"),
+      TRUE ~ "Disease state dominant"
+    ),
+
+    # Assign 'order_plot' values based on 'dominance'
+    order_plot = case_when(
+      dominance == "Disease state dominant" ~ 10 + proportion,
+      dominance == "Disease activity dominant" ~ 100 + proportion,
+      dominance == "Shared dominant" ~ 1000 + proportion[degs_presence == "Both significant"]
+    )
+  )
+
+# Final data structure for heatmap visualization
+filtered_degs_matrix <- filtered_degs_fc_plot %>%
+  group_by(Cell.type, cell_lineage, dominance) %>%
+
+  # Determine the maximum values for 'total_degs' and 'order_plot'
+  mutate(
+    summ_degs = max(total_degs),
+    order_plot = max(order_plot)
+  ) %>% 
+
+  # Filter data based on 'regulation' for 'Upregulated' and 'Downregulated' DEGs
+  filter(regulation %in% c("Upregulated", "Downregulated")) %>%
+
+  # Ungroup the data
+  ungroup() %>%
+
+  # Select and pivot data to create the heatmap matrix
+  select(Cell.type, proportion, regulation, degs_presence) %>%
+  pivot_wider(values_from = "proportion", names_from = c("degs_presence", "regulation")) %>%
+  column_to_rownames("Cell.type") %>%
+
+  # Convert data to a matrix and transpose
+  as.matrix() %>% t()
+```
+
+
+Besides plotting the heatmap itself, hierarchical clustering is applied to categorize cell line groups based on the proportion of DEGs. The results generated above are suitable for heatmaps, enabling the visualization of DEG proportions within different cell types and their regulatory patterns.
+
+```{r}
+# Set the color palette using 'viridis' with 100 color options
+my_palette <- viridisLite::viridis(100, option = "mako")
+
+# Create annotations for row names by extracting text after the last "_" in row names
+row_annotation <- gsub("^.+_", "", rownames(filtered_degs_matrix))
+row_annotation_2 <- gsub("_.*$", "", rownames(filtered_degs_matrix))
+
+# Define color values for different row annotations
+row_col_reg <- c(Upregulated = "#D84630", Downregulated = "#001E1D")
+row_col_sig <- c("Both significant" = "#FDE725FF", 
+                 "Disease-state only" = "#440154FF",
+                 "Disease-activity only" = "#21908CFF")
+
+# Create row annotations for heatmap
+row_anno <- rowAnnotation(
+  regulation = gsub("^.+_", "", rownames(filtered_degs_matrix)),
+  significance = gsub("_.*$", "", rownames(filtered_degs_matrix)),
+  annotation_name_side = "top",
+  col = list(regulation = row_col_reg, significance = row_col_sig),
+  annotation_legend_param = list(
+    regulation = list(title = "DEGs foldchange"),
+    significance = list(title = "DEGs classification")
+  )
+)
+
+# Generate a heatmap using specified parameters and annotations
+heatmap1 <- Heatmap(filtered_degs_matrix, border = T, 
+        cluster_rows = TRUE, cluster_columns = TRUE,
+        clustering_method_rows = "ward.D2", clustering_method_columns = "ward.D2",
+        col = my_palette, show_row_names = FALSE, column_split = 3, 
+        name = "DEGs proportion", right_annotation = row_anno)
+heatmap1
+{
+  pdf(file = paste0(result.dir, "/heatmap_plot.pdf"), height = 5, width = 7)
+  draw(heatmap1)
+  dev.off()
+}
+```
+In conclusion, we can conclude two main points from this visulization and comparison with the previous plot. 
+* The up and downregulated genes have the same proportions across the different DEGs classification. Thus, the analysis with them combined does not impact the grouping strategy based on the proportion of DEGs.The clustering by row is maintained based on DEGs classification rather than if the genes are up or down regulated.
+* Hierarchical clustering could have been a alternative to separate the the lineages in a more data-driven manner than using manual thresholds. Some of the subpopulations ended up in a different group than when compared with the original grouping in the article.
+
+# Session info
+
+```{r session_info}
+sessionInfo()
+```
