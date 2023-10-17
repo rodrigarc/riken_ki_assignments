@@ -334,12 +334,16 @@ row_anno <- rowAnnotation(
   )
 )
 
+# Scale rows of matrix
+
+filtered_degs_matrix_scaled <- filtered_degs_matrix %>% t() %>% scale() %>% t()
+
 # Generate a heatmap using specified parameters and annotations
-heatmap1 <- Heatmap(filtered_degs_matrix, border = T, 
+heatmap1 <- Heatmap(filtered_degs_matrix_scaled, border = T, 
         cluster_rows = TRUE, cluster_columns = TRUE,
         clustering_method_rows = "ward.D2", clustering_method_columns = "ward.D2",
         col = my_palette, show_row_names = FALSE, column_split = 3, 
-        name = "DEGs proportion", right_annotation = row_anno)
+        name = "DEGs proportion\n(Z-score)", right_annotation = row_anno)
 heatmap1
 {
   pdf(file = paste0(result.dir, "/heatmap_plot.pdf"), height = 5, width = 7)
